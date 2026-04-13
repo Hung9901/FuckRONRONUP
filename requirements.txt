@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+orjson
+pydantic
+redis
+aioredis
+uvloop; sys_platform != "win32"
+zstandard
