@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 orjson
 pydantic
-redis
-aioredis
+redis[asyncio]
 uvloop; sys_platform != "win32"
 zstandard

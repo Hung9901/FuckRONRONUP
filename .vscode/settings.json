@@ -1,0 +1,9 @@
+{
+    "python.defaultInterpreterPath": "C:\\Users\\hongj\\AppData\\Local\\Programs\\Python\\Python313\\python.exe",
+    "python.analysis.extraPaths": ["${workspaceFolder}"],
+    "python.envFile": "${workspaceFolder}/.env",
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "[python]": {
+        "editor.formatOnSave": true
+    }
+}

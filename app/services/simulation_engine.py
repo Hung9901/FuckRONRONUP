@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 
 class SimulationEngine:
@@ -14,6 +15,7 @@ class SimulationEngine:
             "enabled": True,
             "declared_use": False,
             "event_rate": 150,
+            "ts": time.time(),
         }
 
     def generate_persistence_pattern(self) -> dict:
@@ -22,6 +24,7 @@ class SimulationEngine:
             "boot_trigger": True,
             "restart_count": 5,
             "foreground_service_long": True,
+            "ts": time.time(),
         }
 
     def generate_permission_escalation(self) -> dict:
@@ -29,6 +32,7 @@ class SimulationEngine:
             "type": "permission",
             "permissions": ["READ_CONTACTS", "RECORD_AUDIO", "ACCESS_FINE_LOCATION"],
             "escalation_sequence": ["READ_CONTACTS", "RECORD_AUDIO", "ACCESS_FINE_LOCATION"],
+            "ts": time.time(),
         }
 
     def generate_anomaly_burst(self) -> dict:
@@ -42,6 +46,7 @@ class SimulationEngine:
                 {"event_rate": 10},
                 {"event_rate": 200},  # spike
             ],
+            "ts": time.time(),
         }
 
     def generate_exfil_transfer(self) -> dict:
@@ -52,6 +57,7 @@ class SimulationEngine:
             "known_host": False,
             "background_transfer": True,
             "burst_count": 8,
+            "ts": time.time(),
         }
 
     def generate_ui_attack(self) -> dict:
@@ -62,6 +68,16 @@ class SimulationEngine:
             "draw_over_apps": True,
             "input_capture": True,
             "invisible_touch_intercept": False,
+            "ts": time.time(),
+        }
+
+    def generate_phishing_click(self) -> dict:
+        return {
+            "type": "phishing_click",
+            "url": "http://fake-update.example.com",
+            "auto_click": False,
+            "outside_app_context": True,
+            "ts": time.time(),
         }
 
     # ------------------------------------------------------------------
@@ -77,24 +93,28 @@ class SimulationEngine:
                                            ↓
                                     EXFIL_PATTERN
         """
+        base_ts = time.time()
         return [
-            {"type": "phishing_click", "url": "http://fake-update.example.com"},
+            {"type": "phishing_click", "url": "http://fake-update.example.com", "ts": base_ts},
             {
                 "type": "permission_request",
                 "permissions": ["READ_CONTACTS", "RECORD_AUDIO", "ACCESS_FINE_LOCATION"],
                 "escalation_sequence": ["READ_CONTACTS", "RECORD_AUDIO", "ACCESS_FINE_LOCATION"],
+                "ts": base_ts + 5,
             },
             {
                 "type": "accessibility_enabled",
                 "enabled": True,
                 "declared_use": False,
                 "event_rate": 180,
+                "ts": base_ts + 12,
             },
             {
                 "type": "background_activity",
                 "boot_trigger": True,
                 "restart_count": 6,
                 "foreground_service_long": True,
+                "ts": base_ts + 20,
             },
             {
                 "type": "data_transfer",
@@ -103,6 +123,7 @@ class SimulationEngine:
                 "known_host": False,
                 "background_transfer": True,
                 "burst_count": 10,
+                "ts": base_ts + 30,
             },
         ]
 
@@ -112,10 +133,13 @@ class SimulationEngine:
 
     def all_scenarios(self) -> list[dict]:
         return [
+            self.generate_phishing_click(),
             self.generate_accessibility_attack(),
             self.generate_persistence_pattern(),
             self.generate_permission_escalation(),
             self.generate_anomaly_burst(),
+            self.generate_exfil_transfer(),
+            self.generate_ui_attack(),
         ]
 
     # ------------------------------------------------------------------

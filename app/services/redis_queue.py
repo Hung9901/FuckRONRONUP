@@ -1,4 +1,4 @@
-import aioredis
+import redis.asyncio as aioredis
 from typing import AsyncGenerator
 
 class RedisStreamQueue:
