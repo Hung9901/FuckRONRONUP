@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Threat Detection Command Center</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0d14;
+      --surface:   #111827;
+      --border:    #1f2937;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --accent:    #38bdf8;
+      --green:     #22c55e;
+      --yellow:    #eab308;
+      --orange:    #f97316;
+      --red:       #ef4444;
+      --critical:  #dc2626;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 14px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: .5px; }
+    header h1 span { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 10px; }
+    #status-dot {
+      display: inline-block; width: 10px; height: 10px;
+      border-radius: 50%; background: var(--muted); margin-right: 8px;
+      transition: background .3s;
+    }
+    #status-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    #status-label { font-size: 13px; color: var(--muted); }
+
+    /* ── Layout ── */
+    main {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 0;
+      height: calc(100vh - 57px);
+    }
+
+    /* ── Sidebar ── */
+    aside {
+      grid-row: 1 / -1;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .sidebar-section { padding: 20px; border-bottom: 1px solid var(--border); }
+    .sidebar-section h2 { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; }
+
+    /* ── Metric cards ── */
+    .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .metric-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .metric-card .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+    .metric-card .value { font-size: 20px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+
+    /* ── Scenario buttons ── */
+    .btn-grid { display: grid; gap: 7px; }
+    .btn {
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--bg);
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      font-size: 13px;
+      font-family: inherit;
+      transition: border-color .2s, background .2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn:hover { border-color: var(--accent); background: #0f172a; }
+    .btn.chain { border-color: #7c3aed; color: #a78bfa; }
+    .btn.chain:hover { background: #1e1033; border-color: #a78bfa; }
+    .btn .ico { font-size: 15px; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Right panel ── */
+    .right-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      overflow: hidden;
+    }
+
+    /* ── Threat banner ── */
+    #threat-banner {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--surface);
+      transition: background .4s;
+    }
+    #threat-banner.LOW    { border-left: 4px solid var(--green); }
+    #threat-banner.MEDIUM { border-left: 4px solid var(--yellow); }
+    #threat-banner.HIGH   { border-left: 4px solid var(--orange); }
+    #threat-banner.CRITICAL { border-left: 4px solid var(--critical); background: #1a0a0a; }
+
+    #threat-level {
+      font-size: 28px; font-weight: 800; letter-spacing: 1px;
+    }
+    .LOW    #threat-level { color: var(--green); }
+    .MEDIUM #threat-level { color: var(--yellow); }
+    .HIGH   #threat-level { color: var(--orange); }
+    .CRITICAL #threat-level { color: var(--critical); }
+
+    #risk-score { font-size: 13px; color: var(--muted); }
+    #risk-score strong { font-size: 22px; color: var(--text); }
+
+    #chain-badge {
+      margin-left: auto;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+      display: none;
+    }
+    #chain-badge.active {
+      display: inline-block;
+      border-color: #7c3aed;
+      background: #1e1033;
+      color: #c4b5fd;
+    }
+
+    /* ── Content tabs ── */
+    .content-area { overflow: hidden; display: flex; flex-direction: column; }
+    .tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 24px; background: var(--surface); }
+    .tab {
+      padding: 12px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: color .2s;
+      margin-bottom: -1px;
+    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-panels { flex: 1; overflow: hidden; }
+    .tab-panel { display: none; height: 100%; overflow-y: auto; padding: 20px 24px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Signal pills ── */
+    #signals-container { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 20px; }
+    .signal-pill {
+      padding: 4px 11px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      animation: pop .2s ease;
+    }
+    .signal-pill.hot { background: #1a0e2a; border-color: #7c3aed; color: #c4b5fd; }
+    @keyframes pop { from { transform: scale(.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* ── Attack graph ── */
+    #graph-container { margin-bottom: 20px; }
+    .graph-nodes { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+    .graph-node {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1.5px solid var(--border);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      background: var(--bg);
+      transition: all .3s;
+      position: relative;
+    }
+    .graph-node.matched {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: #0c1a26;
+      box-shadow: 0 0 8px rgba(56,189,248,.2);
+    }
+    .graph-node.matched.critical { border-color: var(--critical); color: var(--critical); background: #1a0808; box-shadow: 0 0 8px rgba(220,38,38,.2); }
+    .graph-arrow { color: var(--muted); font-size: 16px; }
+    .graph-score { font-size: 13px; color: var(--muted); margin-top: 10px; }
+    .graph-score strong { color: var(--text); }
+
+    /* ── Timeline ── */
+    .timeline { display: flex; flex-direction: column; gap: 12px; }
+    .tl-item {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    .tl-type {
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--muted);
+      text-align: center;
+      word-break: break-all;
+    }
+    .tl-body { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+    .tl-agents { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+    .tl-agent { font-size: 11px; padding: 3px 8px; border-radius: 5px; background: #1e293b; color: var(--accent); border: 1px solid #1e3a4f; }
+    .tl-risk { font-size: 12px; color: var(--muted); }
+    .tl-risk strong { color: var(--text); }
+    .tl-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    .tl-flag { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: #1a0e2a; color: #a78bfa; border: 1px solid #3b1f6e; }
+
+    /* ── Raw JSON ── */
+    #raw-output {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      white-space: pre;
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+
+    /* ── Agent hits table ── */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 12px; border-bottom: 1px solid #0f172a; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    .hit-bar-wrap { background: var(--bg); border-radius: 4px; height: 6px; overflow: hidden; margin-top: 4px; }
+    .hit-bar { height: 6px; background: var(--accent); border-radius: 4px; transition: width .4s; }
+
+    /* ── Empty state ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+    .empty .ico { font-size: 40px; margin-bottom: 12px; }
+    .empty p { font-size: 14px; }
+
+    /* ── Spinner ── */
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ Threat Detection Command Center <span>FuckRONRONUP</span></h1>
+  <div>
+    <span id="status-dot"></span>
+    <span id="status-label">Checking...</span>
+  </div>
+</header>
+
+<main>
+  <!-- ── Sidebar ── -->
+  <aside>
+    <div class="sidebar-section">
+      <h2>Pipeline Metrics</h2>
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="label">Processed</div>
+          <div class="value" id="m-processed">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Errors</div>
+          <div class="value" id="m-errors">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">Dropped</div>
+          <div class="value" id="m-dropped">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="label">p95 ms</div>
+          <div class="value" id="m-p95">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h2>Simulations</h2>
+      <div class="btn-grid">
+        <button class="btn chain" onclick="runChain()">
+          <span class="ico">🔗</span> Full Attack Chain
+        </button>
+        <button class="btn" onclick="runScenario('all')">
+          <span class="ico">📦</span> All Scenarios
+        </button>
+        <button class="btn" onclick="runScenario('phishing')">
+          <span class="ico">🎣</span> Phishing Click
+        </button>
+        <button class="btn" onclick="runScenario('accessibility')">
+          <span class="ico">♿</span> Accessibility
+        </button>
+        <button class="btn" onclick="runScenario('permission')">
+          <span class="ico">🔑</span> Permission Escalation
+        </button>
+        <button class="btn" onclick="runScenario('persistence')">
+          <span class="ico">🔄</span> Persistence
+        </button>
+        <button class="btn" onclick="runScenario('anomaly')">
+          <span class="ico">📈</span> Anomaly Burst
+        </button>
+        <button class="btn" onclick="runScenario('exfil')">
+          <span class="ico">📤</span> Exfil Transfer
+        </button>
+        <button class="btn" onclick="runScenario('ui')">
+          <span class="ico">🖥️</span> UI Attack
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:auto">
+      <h2>Queue</h2>
+      <div style="font-size:22px;font-weight:700;color:var(--accent)" id="queue-size">—</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:3px">events pending</div>
+    </div>
+  </aside>
+
+  <!-- ── Right panel ── -->
+  <div class="right-panel">
+    <!-- Threat banner -->
+    <div id="threat-banner" class="LOW">
+      <div>
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Threat Level</div>
+        <div id="threat-level">—</div>
+      </div>
+      <div style="width:1px;height:40px;background:var(--border)"></div>
+      <div id="risk-score"><strong id="risk-val">0</strong><br>risk score</div>
+      <div style="width:1px;height:40px;background:var(--border)"></div>
+      <div id="seq-status" style="font-size:13px;color:var(--muted)">No simulation run yet</div>
+      <div id="chain-badge">⛓ FULL ATTACK CHAIN</div>
+    </div>
+
+    <!-- Content -->
+    <div class="content-area">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('overview')">Overview</div>
+        <div class="tab" onclick="switchTab('timeline')">Timeline</div>
+        <div class="tab" onclick="switchTab('agents')">Agents</div>
+        <div class="tab" onclick="switchTab('raw')">Raw JSON</div>
+      </div>
+      <div class="tab-panels">
+
+        <!-- Overview tab -->
+        <div class="tab-panel active" id="tab-overview">
+          <div id="empty-state" class="empty">
+            <div class="ico">🛡️</div>
+            <p>Run a simulation to see results</p>
+          </div>
+          <div id="overview-content" style="display:none">
+            <div style="margin-bottom:16px">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Active Signals</div>
+              <div id="signals-container"></div>
+            </div>
+            <div id="graph-container">
+              <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Attack Graph</div>
+              <div class="graph-nodes" id="graph-nodes"></div>
+              <div class="graph-score" id="graph-score-text"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline tab -->
+        <div class="tab-panel" id="tab-timeline">
+          <div id="timeline-empty" class="empty">
+            <div class="ico">🕐</div>
+            <p>Run the Full Attack Chain to see the event timeline</p>
+          </div>
+          <div class="timeline" id="timeline-list"></div>
+        </div>
+
+        <!-- Agents tab -->
+        <div class="tab-panel" id="tab-agents">
+          <div id="agents-empty" class="empty">
+            <div class="ico">🤖</div>
+            <p>Run a simulation to see agent activity</p>
+          </div>
+          <div id="agents-table" style="display:none">
+            <table>
+              <thead><tr><th>Agent</th><th>Hits</th><th>Activity</th></tr></thead>
+              <tbody id="agent-rows"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Raw JSON tab -->
+        <div class="tab-panel" id="tab-raw">
+          <pre id="raw-output">// Run a simulation to see raw output</pre>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const THREAT_COLORS = { LOW: '#22c55e', MEDIUM: '#eab308', HIGH: '#f97316', CRITICAL: '#dc2626' };
+  const GRAPH_ORDER   = ['UI_ATTACK','PHISHING_INTERACTION','PERMISSION_ESCALATION','ACCESSIBILITY_RISK','PERSISTENCE_PATTERN','EXFIL_PATTERN'];
+  const GRAPH_LABELS  = {
+    UI_ATTACK: 'UI Attack', PHISHING_INTERACTION: 'Phishing',
+    PERMISSION_ESCALATION: 'Permission Esc.', ACCESSIBILITY_RISK: 'Accessibility Risk',
+    PERSISTENCE_PATTERN: 'Persistence', EXFIL_PATTERN: 'Exfil',
+  };
+  const CRITICAL_NODES = new Set(['PERSISTENCE_PATTERN','EXFIL_PATTERN']);
+
+  let lastData = null;
+
+  // ── Tab switching ──────────────────────────────────────────────────
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach((t,i) => {
+      const panels = ['overview','timeline','agents','raw'];
+      t.classList.toggle('active', panels[i] === name);
+    });
+    document.querySelectorAll('.tab-panel').forEach(p => {
+      p.classList.toggle('active', p.id === 'tab-' + name);
+    });
+  }
+
+  // ── Health + Metrics polling ───────────────────────────────────────
+  async function pollHealth() {
+    try {
+      const r = await fetch('/health');
+      const d = await r.json();
+      document.getElementById('status-dot').className = 'online';
+      document.getElementById('status-label').textContent = 'Online';
+      document.getElementById('queue-size').textContent = d.queue_size ?? 0;
+    } catch {
+      document.getElementById('status-dot').className = '';
+      document.getElementById('status-label').textContent = 'Offline';
+    }
+  }
+
+  async function pollMetrics() {
+    try {
+      const r = await fetch('/metrics');
+      const d = await r.json();
+      document.getElementById('m-processed').textContent = d.events_processed;
+      document.getElementById('m-errors').textContent    = d.agent_errors;
+      document.getElementById('m-dropped').textContent   = d.events_dropped;
+      const p95 = d.processing_latency?.p95;
+      document.getElementById('m-p95').textContent = p95 != null ? (p95 * 1000).toFixed(1) : '—';
+    } catch {}
+  }
+
+  setInterval(() => { pollHealth(); pollMetrics(); }, 2000);
+  pollHealth(); pollMetrics();
+
+  // ── Loading state ──────────────────────────────────────────────────
+  function setLoading(on) {
+    document.querySelectorAll('.btn').forEach(b => b.disabled = on);
+  }
+
+  // ── Render result ──────────────────────────────────────────────────
+  function renderResult(data, isChain) {
+    lastData = data;
+    const risk = isChain ? data : (data.risk || data.final_risk || {});
+
+    // Banner
+    const level = risk.threat_level || 'LOW';
+    const banner = document.getElementById('threat-banner');
+    banner.className = level;
+    document.getElementById('threat-level').textContent = level;
+    document.getElementById('risk-val').textContent = risk.total_risk ?? 0;
+
+    if (isChain) {
+      document.getElementById('seq-status').textContent =
+        data.sequence_detected ? '✅ Sequence Detected' : '❌ Sequence Not Detected';
+      document.getElementById('chain-badge').className = data.sequence_detected ? 'active' : '';
+    } else {
+      document.getElementById('seq-status').textContent = 'Single scenario';
+      document.getElementById('chain-badge').className = '';
+    }
+
+    // Signals
+    const signals = risk.active_signals || (isChain ? data.signals : []) || [];
+    const sc = document.getElementById('signals-container');
+    sc.innerHTML = signals.length
+      ? signals.map(s => `<span class="signal-pill hot">${s}</span>`).join('')
+      : '<span style="color:var(--muted);font-size:13px">No signals detected</span>';
+
+    // Attack graph
+    const graph = isChain ? data.graph : null;
+    const gn = document.getElementById('graph-nodes');
+    gn.innerHTML = '';
+    GRAPH_ORDER.forEach((node, i) => {
+      const matched = graph ? graph.matched_nodes?.includes(node) : false;
+      const isCrit  = CRITICAL_NODES.has(node) && matched;
+      const el = document.createElement('span');
+      el.className = 'graph-node' + (matched ? ' matched' : '') + (isCrit ? ' critical' : '');
+      el.textContent = GRAPH_LABELS[node];
+      gn.appendChild(el);
+      if (i < GRAPH_ORDER.length - 1) {
+        const arr = document.createElement('span');
+        arr.className = 'graph-arrow';
+        arr.textContent = '→';
+        gn.appendChild(arr);
+      }
+    });
+    const gst = document.getElementById('graph-score-text');
+    if (graph) {
+      gst.innerHTML = `Graph score: <strong>${graph.graph_score}</strong> &nbsp;·&nbsp; Coverage: <strong>${Math.round((graph.coverage||0)*100)}%</strong> &nbsp;·&nbsp; Full chain: <strong>${graph.full_chain_detected ? '✅ Yes' : '❌ No'}</strong>`;
+    } else {
+      gst.textContent = '';
+    }
+
+    // Show overview content
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('overview-content').style.display = 'block';
+
+    // Timeline
+    const tl = document.getElementById('timeline-list');
+    const tlEmpty = document.getElementById('timeline-empty');
+    const timeline = isChain ? (data.timeline || []) : [];
+    if (timeline.length) {
+      tlEmpty.style.display = 'none';
+      tl.innerHTML = timeline.map(item => {
+        const agents = item.agent_results || [];
+        const flags  = agents.flatMap(a => a.flags || []);
+        const snap   = item.risk_snapshot || {};
+        return `
+          <div class="tl-item">
+            <div class="tl-type">${item.event?.type || ''}</div>
+            <div class="tl-body">
+              <div class="tl-agents">
+                ${agents.map(a => `<span class="tl-agent">${a.agent} +${a.risk_score}</span>`).join('') || '<span style="color:var(--muted);font-size:12px">no agents matched</span>'}
+              </div>
+              <div class="tl-risk">Total risk: <strong>${snap.total_risk ?? '—'}</strong> &nbsp; Level: <strong style="color:${THREAT_COLORS[snap.threat_level]||'#fff'}">${snap.threat_level || '—'}</strong></div>
+              ${flags.length ? `<div class="tl-flags">${flags.map(f=>`<span class="tl-flag">${f}</span>`).join('')}</div>` : ''}
+            </div>
+          </div>`;
+      }).join('');
+    } else {
+      tlEmpty.style.display = 'block';
+      tl.innerHTML = '';
+    }
+
+    // Agents table
+    const hits = risk.agent_hits || {};
+    const agentRows = document.getElementById('agent-rows');
+    const agentsTable = document.getElementById('agents-table');
+    if (Object.keys(hits).length) {
+      const max = Math.max(...Object.values(hits));
+      agentsTable.style.display = 'block';
+      document.getElementById('agents-empty').style.display = 'none';
+      agentRows.innerHTML = Object.entries(hits).sort((a,b)=>b[1]-a[1]).map(([name, count]) => `
+        <tr>
+          <td>${name}</td>
+          <td><strong>${count}</strong></td>
+          <td style="width:40%">
+            <div class="hit-bar-wrap"><div class="hit-bar" style="width:${(count/max*100).toFixed(0)}%"></div></div>
+          </td>
+        </tr>`).join('');
+    } else {
+      agentsTable.style.display = 'none';
+      document.getElementById('agents-empty').style.display = 'block';
+    }
+
+    // Raw JSON
+    document.getElementById('raw-output').textContent = JSON.stringify(data, null, 2);
+
+    pollMetrics();
+  }
+
+  // ── Simulation runners ─────────────────────────────────────────────
+  async function runChain() {
+    setLoading(true);
+    document.getElementById('seq-status').innerHTML = '<span class="spinner"></span> Running chain...';
+    try {
+      const r = await fetch('/simulate/chain', { method: 'POST' });
+      const d = await r.json();
+      renderResult(d, true);
+      switchTab('overview');
+    } catch(e) {
+      document.getElementById('seq-status').textContent = '❌ Error: ' + e.message;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runScenario(name) {
+    setLoading(true);
+    document.getElementById('seq-status').innerHTML = '<span class="spinner"></span> Running...';
+    const url = name === 'all' ? '/simulate/all' : `/simulate/${name}`;
+    try {
+      const r = await fetch(url, { method: 'POST' });
+      const d = await r.json();
+      renderResult(d, false);
+      switchTab('overview');
+    } catch(e) {
+      document.getElementById('seq-status').textContent = '❌ Error: ' + e.message;
+    } finally {
+      setLoading(false);
+    }
+  }
+</script>
+</body>
+</html>
