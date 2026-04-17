@@ -7,8 +7,10 @@ opentelemetry-sdk and keep the same call sites.
 """
 
 import time
-from collections import defaultdict
+from collections import defaultdict, deque
 from threading import Lock
+
+_HISTOGRAM_CAP = 10_000
 
 
 class _Counter:
@@ -25,30 +27,32 @@ class _Counter:
 
 
 class _Histogram:
-    """Records observed values and exposes p50 / p95 / p99 approximations."""
+    """Records observed values and exposes p50 / p95 / p99 approximations.
 
-    def __init__(self):
-        self._observations: list[float] = []
+    Backed by a bounded deque so eviction is O(1) — the old implementation
+    rebuilt a 10K-element list on every observation past the cap.
+    """
+
+    def __init__(self, maxlen: int = _HISTOGRAM_CAP):
+        self._observations: deque[float] = deque(maxlen=maxlen)
         self._lock = Lock()
 
     def observe(self, value: float) -> None:
         with self._lock:
             self._observations.append(value)
-            # Cap memory: keep last 10 000 observations
-            if len(self._observations) > 10_000:
-                self._observations = self._observations[-10_000:]
 
     def summary(self) -> dict:
         with self._lock:
-            data = sorted(self._observations)
+            data = list(self._observations)  # copy under lock, sort outside
         if not data:
             return {"count": 0, "p50": None, "p95": None, "p99": None}
+        data.sort()
         n = len(data)
         return {
             "count": n,
             "p50": data[int(n * 0.50)],
-            "p95": data[int(n * 0.95)],
-            "p99": data[int(n * 0.99)],
+            "p95": data[min(int(n * 0.95), n - 1)],
+            "p99": data[min(int(n * 0.99), n - 1)],
         }
 
 

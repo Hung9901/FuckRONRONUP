@@ -1,13 +1,8 @@
-class PhishingAgent:
-    """
-    Detects phishing interaction signals.
+from app.services.mitre_mapper import map_flags_to_techniques
 
-    Handles events of type 'phishing_click'.
-    Scored signals:
-      - click on a known-bad or unrecognized URL
-      - interaction outside expected app context
-      - short dwell time (fast auto-click)
-    """
+
+class PhishingAgent:
+    """Detects phishing interaction signals."""
 
     def can_handle(self, event: dict) -> bool:
         return event.get("type") == "phishing_click"
@@ -32,4 +27,5 @@ class PhishingAgent:
             "agent": "phishing",
             "flags": flags,
             "risk_score": risk,
+            "mitre_techniques": map_flags_to_techniques(flags),
         }

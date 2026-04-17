@@ -17,6 +17,10 @@ class RedisStreamQueue:
         last_id = "$"
         while True:
             messages = await self.redis.xread({self.stream: last_id}, block=1000)
+            # xread returns None when the block timeout expires with no new
+            # messages — iterating None would raise TypeError.
+            if not messages:
+                continue
             for _, entries in messages:
                 for entry_id, fields in entries:
                     last_id = entry_id

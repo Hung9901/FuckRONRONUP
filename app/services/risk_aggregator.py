@@ -38,6 +38,9 @@ class RiskAggregator:
     def get(self, device_id: str) -> dict:
         return self._snapshot(device_id)
 
+    def get_all(self) -> dict[str, dict]:
+        return {did: self._snapshot(did) for did in self._scores}
+
     def reset(self, device_id: str) -> None:
         self._scores.pop(device_id, None)
         self._signals.pop(device_id, None)

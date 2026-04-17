@@ -1,5 +1,6 @@
 import math
 from app.core.config import settings
+from app.services.mitre_mapper import map_flags_to_techniques
 
 
 class AnomalyAgent:
@@ -10,12 +11,16 @@ class AnomalyAgent:
         history = event.get("event_history", [])
         result = detect_anomaly(history)
 
+        flags: list[str] = ["ANOMALY_DETECTED"] if result["detected"] else []
+
         return {
             "agent": "anomaly",
+            "flags": flags,
             "anomaly_detected": result["detected"],
             "method": result["method"],
             "details": result["details"],
             "risk_score": 5 if result["detected"] else 0,
+            "mitre_techniques": map_flags_to_techniques(flags),
         }
 
 

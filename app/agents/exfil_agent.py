@@ -1,3 +1,6 @@
+from app.services.mitre_mapper import map_flags_to_techniques
+
+
 class ExfilAgent:
     """
     Detects network-level data exfiltration patterns.
@@ -38,4 +41,5 @@ class ExfilAgent:
             "agent": "exfil",
             "flags": flags,
             "risk_score": risk,
+            "mitre_techniques": map_flags_to_techniques(flags),
         }

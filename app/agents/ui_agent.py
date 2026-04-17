@@ -1,3 +1,6 @@
+from app.services.mitre_mapper import map_flags_to_techniques
+
+
 class UIAgent:
     """
     Detects UI manipulation and overlay-based attack patterns.
@@ -37,4 +40,5 @@ class UIAgent:
             "agent": "ui",
             "flags": flags,
             "risk_score": risk,
+            "mitre_techniques": map_flags_to_techniques(flags),
         }

@@ -20,9 +20,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="FuckRONRONUP Threat Detection",
-    description="Real-time mobile threat detection pipeline",
-    version="1.0.0",
+    title="SENTINEL — Mobile Threat Detection Platform",
+    description=(
+        "Enterprise-grade real-time mobile threat detection pipeline. "
+        "Combines multi-agent behavioral analysis, MITRE ATT&CK for Mobile "
+        "technique mapping, attack-graph scoring, and Claude Opus 4.7 AI "
+        "threat intelligence with webhook alerting."
+    ),
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -36,3 +41,8 @@ app.include_router(ws_router)
 @app.get("/")
 async def dashboard():
     return FileResponse(_static / "index.html")
+
+
+@app.get("/tutorial")
+async def tutorial():
+    return FileResponse(_static / "tutorial.html")
